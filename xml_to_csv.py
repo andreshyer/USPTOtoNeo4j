@@ -3,6 +3,11 @@ import os
 import xml.etree.ElementTree as ET
 
 
+"""
+This file is sloppy and not well organized. But it serves a simple purpose. Convert all the xml files to csv files 
+"""
+
+
 def get_compound_info(compound):
     chemical_name_list = []
     identifiers_list = []
