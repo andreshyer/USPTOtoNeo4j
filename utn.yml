@@ -1,4 +1,4 @@
-name: mlapp
+name: utn
 channels:
   - anaconda-fusion
   - defaults
