@@ -10,8 +10,8 @@ import py2neo
 from py2neo import Graph
 from rdkit.Chem import MolToSmiles, MolFromSmiles, rdChemReactions
 from rdkit.Chem.Descriptors import MolWt
-from Neo4j.US_patents.US_patents_xml_to_csv import US_grants_directory_to_csvs
-from Neo4j.US_patents.backends import clean_up_checker_files, get_functional_groups, \
+from xml_to_csv import US_grants_directory_to_csvs
+from backends import clean_up_checker_files, get_functional_groups, \
     get_file_location, map_rxn_functional_groups
 
 from rdkit import RDLogger
@@ -331,7 +331,7 @@ if __name__ == "__main__":
         patents_directory='/home/user/Desktop/5104873',
         number_of_cups=3,
         convert_xml_to_csv=False,
-        clean_checker_files=True,
+        clean_checker_files=False,
         insert_compounds_with_functional_groups=False,
         insert_change_in_functional_groups=False,
         loading_bars=True,
