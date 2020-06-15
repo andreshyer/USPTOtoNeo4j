@@ -1,0 +1,15 @@
+entity Compound {
+	appearance String
+	chemicalname String
+    inchi String
+    molarmass Double
+    smiles String required unique
+}
+
+entity Reaction {
+	patentid String
+	details String
+	smiles String required unique
+}
+
+paginate Compound, Reaction with pagination
