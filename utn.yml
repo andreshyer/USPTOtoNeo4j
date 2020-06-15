@@ -12,5 +12,4 @@ dependencies:
   - rdkit
   - py2neo
   - xlrd
-
-prefix: /opt/anaconda3/envs/utn
+  - tqdm
