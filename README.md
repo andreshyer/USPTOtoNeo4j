@@ -1,6 +1,7 @@
 ## USPTO to Neo4j
 
-This package is meant to help data analysts and chemist who wish to view the USPTO data in Neo4j. 
+This package is meant to help data analysts and chemist who wish to view the USPTO data in Neo4j. Viewing US Patent
+chemical data in Neo4j allows for chemical reaction pathway searching that traditional databases can not provide. 
 
 ## Getting required data
 
@@ -31,8 +32,8 @@ Make sure the data is extracted and formatted properly, otherwise the initializa
 When you download the data this way, the data is formatted only in a xml format. When running the initialization step in 
 the next section, make sure to set ```convert_xml_to_csv=True```.
 
-A more simplified way of downloading the data is going to this link
-[link]
+A more simplified way of downloading the data is going to the release for this package and downloading 5104873.7z from
+https://github.com/andreshyer/USPTOtoNeo4j/releases/tag/v0.1-beta.
 and simply download and extract the data. If you download the data this way, you must set
 ```convert_xml_to_csv=False```. 
 
@@ -43,10 +44,9 @@ https://neo4j.com/docs/getting-started/current/.
 
 The steps needed to insert data into Neo4j are:
 
-1. Ensure python environment is confiured properly using conda and mlapp.yml
+1. Ensure python environment is confiured properly using conda and utn.yml
 2. Create and startup a Neo4j graph database
-3. Configure ```bulk_insert.py```
-4. Run ```bulk_insert.py``` 
+3. Configure and run ```bulk_insert.py```
 
 To configure ```bulk_insert.py```, it is necessary to hard code the parameters. The setting are found at the bottom of
 ```bulk_insert.py```. The defaults settings are
