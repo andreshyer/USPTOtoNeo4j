@@ -1,0 +1,16 @@
+name: mlapp
+channels:
+  - anaconda-fusion
+  - defaults
+  - rdkit
+  - pytorch
+  - conda-forge
+dependencies:
+  - pip
+  - numpy
+  - pandas
+  - rdkit
+  - py2neo
+  - xlrd
+
+prefix: /opt/anaconda3/envs/utn
