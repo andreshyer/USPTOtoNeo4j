@@ -121,6 +121,7 @@ class InitPatentsIntoNeo4j:
         print(f"There are {len(file_data)} reactions in file")
 
         file_data['reaction_smiles'] = self.parallel_apply(file_data['reaction_smiles'], self.get_new_reaction_smiles)
+        file_data = file_data.loc[file_data['reaction_smiles'] != 'bad_smiles']
         file_data['reactants'] = self.parallel_apply(file_data['reactants'], self.clean_up_compounds)
         file_data['products'] = self.parallel_apply(file_data['products'], self.clean_up_compounds)
         file_data['solvents'] = self.parallel_apply(file_data['solvents'], self.clean_up_compounds)
@@ -201,9 +202,12 @@ class InitPatentsIntoNeo4j:
         if len(reaction_smiles.split('|')[0]) > 1:
             reaction_smiles = reaction_smiles.split('|')[0]
 
-        rxn = rdChemReactions.ReactionFromSmarts(reaction_smiles)
-        new_smiles = rdChemReactions.ReactionToSmarts(rxn)
-        return new_smiles
+        try:
+            rxn = rdChemReactions.ReactionFromSmarts(reaction_smiles)
+            new_smiles = rdChemReactions.ReactionToSmarts(rxn)
+            return new_smiles
+        except RuntimeError:
+            return 'bad_smiles'
 
     def clean_up_compounds(self, compounds):
         """
@@ -328,7 +332,7 @@ class InitPatentsIntoNeo4j:
 
 if __name__ == "__main__":
     params = dict(
-        patents_directory='/home/user/Desktop/5104873',
+        patents_directory='5104873',
         number_of_cups=3,
         convert_xml_to_csv=False,
         clean_checker_files=False,
