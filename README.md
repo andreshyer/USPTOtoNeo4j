@@ -58,8 +58,7 @@ To configure ```bulk_insert.py```, it is necessary to hard code the parameters. 
          convert_xml_to_csv=False,
          clean_checker_files=False,
          insert_compounds_with_functional_groups=False,
-         insert_change_in_functional_groups=False,
-         loading_bars=True,
+         insert_change_in_functional_groups=False
      )
  
      graph = Graph(user='neo4j', password='password', bolt_port='bolt://localhost:7687')
