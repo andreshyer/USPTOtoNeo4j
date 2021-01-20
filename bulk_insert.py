@@ -2,6 +2,7 @@ import ast
 import os
 import timeit
 import tqdm
+from tqdm import tqdm
 import multiprocessing
 import concurrent.futures as cf
 import pandas as pd
@@ -22,7 +23,7 @@ class InitPatentsIntoNeo4j:
 
     def __init__(self, patents_directory=None, number_of_cups=multiprocessing.cpu_count(),
                  convert_xml_to_csv=False, clean_checker_files=False, insert_compounds_with_functional_groups=False,
-                 insert_change_in_functional_groups=False, loading_bars=True):
+                 insert_change_in_functional_groups=False):
 
         if patents_directory is None:
             raise Exception("Directory for US patents must be specified")
@@ -33,7 +34,7 @@ class InitPatentsIntoNeo4j:
         self.clean_checker_files = clean_checker_files
         self.insert_compounds_with_functional_groups = insert_compounds_with_functional_groups
         self.insert_change_in_functional_groups = insert_change_in_functional_groups
-        self.loading_bars = loading_bars
+        # self.loading_bars = loading_bars
 
         self.fragments_df = pd.read_csv(get_file_location() + '/datafiles/Function-Groups-SMARTS.csv')
         self.__main__()
@@ -53,27 +54,36 @@ class InitPatentsIntoNeo4j:
         self.__check_for_constraint__()
         for main_directory in os.listdir(self.US_patents_directory):
             main_directory = self.US_patents_directory + '/' + main_directory
+
+            print("\n---------------------------------------")
+            print(f'Working on directory {main_directory}')
+            num_sub_dirs = len(os.listdir(main_directory))
+            print(f'Number of subdirectories: {num_sub_dirs}')
+            print("---------------------------------------")
+
             for directory in os.listdir(main_directory):
+                print(f'\nWorking on subdirectory: {directory}')
+                print(f'Number of subdirectories left: {num_sub_dirs}')
                 if directory[-4:] == '_csv':
                     directory = main_directory + '/' + directory
-                    number_of_files = len(os.listdir(directory))
-                    i = 0
+
+                    files = []
                     for file in os.listdir(directory):
                         file = directory + '/' + file
+                        if file.split('.')[-1] != 'checker':
+                            if not os.path.exists(file + '.checker'):
+                                files.append(file)
 
-                        file_split = file.split('.')
-                        file_split = file_split[len(file_split) - 1]
-
-                        if not os.path.exists(file + '.checker') and file_split != 'checker':
-                            print("---------------------------------------")
-                            print(f"Working in directory {directory}\n"
-                                  f"There are {number_of_files - i} files remaining")
+                    if files:
+                        for file in tqdm(files):
                             try:
                                 self.__run_file__(file)
                                 open(file + ".checker", "a").close()
                             except pd.errors.EmptyDataError:
                                 open(file + ".checker", "a").close()
-                        i = i + 1
+
+                num_sub_dirs = num_sub_dirs - 1
+
         time_needed_minutes = round((timeit.default_timer() - main_timer) / 60, 2)
         time_needed_hours = round(time_needed_minutes / 60, 2)
         print("---------------------------------------")
@@ -114,11 +124,7 @@ class InitPatentsIntoNeo4j:
         Then the list is feed to neo4j where the reactions are merged to the graph.
         """
 
-        start_timer = timeit.default_timer()
-
         file_data = pd.read_csv(working_file)
-
-        print(f"There are {len(file_data)} reactions in file")
 
         file_data['reaction_smiles'] = self.parallel_apply(file_data['reaction_smiles'], self.get_new_reaction_smiles)
         file_data = file_data.loc[file_data['reaction_smiles'] != 'bad_smiles']
@@ -146,8 +152,6 @@ class InitPatentsIntoNeo4j:
         tx = graph.begin(autocommit=True)
         tx.evaluate(self.__get_reaction_query__(), parameters={"parameters": reactions})
 
-        time_needed = round((timeit.default_timer() - start_timer), 2)
-        print(f"Time Needed for file {time_needed} seconds")
 
     @staticmethod
     def __aw__(df_column, function, **props):
@@ -178,18 +182,12 @@ class InitPatentsIntoNeo4j:
             for mid_df in mid_dfs:
                 results.append(executor.submit(self.__aw__, mid_df, function, **props))
 
-            if self.loading_bars:
-                for f in tqdm.tqdm(cf.as_completed(results), total=self.number_of_cpus):
-                    if main_df is None:
-                        main_df = f.result()
-                    else:
-                        main_df = main_df.append(f.result())
-            else:
-                for f in cf.as_completed(results):
-                    if main_df is None:
-                        main_df = f.result()
-                    else:
-                        main_df = main_df.append(f.result())
+            for f in cf.as_completed(results):
+                if main_df is None:
+                    main_df = f.result()
+                else:
+                    main_df = main_df.append(f.result())
+
         return main_df
 
     @staticmethod
@@ -333,12 +331,11 @@ class InitPatentsIntoNeo4j:
 if __name__ == "__main__":
     params = dict(
         patents_directory='5104873',
-        number_of_cups=3,
+        number_of_cups=5,
         convert_xml_to_csv=False,
         clean_checker_files=False,
         insert_compounds_with_functional_groups=False,
-        insert_change_in_functional_groups=False,
-        loading_bars=True,
+        insert_change_in_functional_groups=False
     )
 
     graph = Graph(user='neo4j', password='password', bolt_port='bolt://localhost:7687')
