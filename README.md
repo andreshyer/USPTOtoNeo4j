@@ -51,29 +51,19 @@ The steps needed to insert data into Neo4j are:
 To configure ```bulk_insert.py```, it is necessary to hard code the parameters. The setting are found at the bottom of
 ```bulk_insert.py```. The defaults settings are
 ```
- if __name__ == "__main__":
-     params = dict(
-         patents_directory='/home/user/Desktop/5104873',
-         number_of_cups=3,
-         convert_xml_to_csv=False,
-         clean_checker_files=False,
-         insert_compounds_with_functional_groups=False,
-         insert_change_in_functional_groups=False
-     )
- 
-     graph = Graph(user='neo4j', password='password', bolt_port='bolt://localhost:7687')
-     InitPatentsIntoNeo4j(**params)     
+    params = dict(
+        patents_directory='5104873',
+        number_of_cups=3,
+        convert_xml_to_csv=False,
+        insert_compounds_with_functional_groups=False,
+        insert_change_in_functional_groups=False
+    )    
 ```
 
 Make sure the patents_directory refers the head of the directory tree as shown above.
-The most important setting to note is ```clean_checker_files=False```. This clean checker files option keeps track
-of which files have already been inserted into Neo4j. So when clean checker files is set to false, it is safe to pause
-the script and resume later. But, if you want to create a new graph or re-initalize the graph, then set
-```clean_checker_files=True```. This will delete all the tracking files and allow you to restart the inserting of the
-files.
 
-The other options are hopefully self explanatory, with the exception of ```insert_change_in_functional_groups=False```.
-This option seeks to track what functional groups change between reactants and products in a given reaction. This option
+The ```insert_change_in_functional_groups=False```.
+option seeks to track what functional groups change between reactants and products in a given reaction. This option
 is useful depending on certain tasks, but is set to false by default. 
 
 Also, it is important to note that calculating functional groups will require much more time to insert the data into 
