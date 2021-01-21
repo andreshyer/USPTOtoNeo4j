@@ -7,8 +7,7 @@ import multiprocessing
 import concurrent.futures as cf
 import pandas as pd
 
-import py2neo
-from py2neo import Graph
+from neo4j import GraphDatabase
 from rdkit.Chem import MolToSmiles, MolFromSmiles, rdChemReactions
 from rdkit.Chem.Descriptors import MolWt
 from xml_to_csv import US_grants_directory_to_csvs
@@ -16,13 +15,16 @@ from backends import clean_up_checker_files, get_functional_groups, \
     get_file_location, map_rxn_functional_groups
 
 from rdkit import RDLogger
+import urllib3
+
 RDLogger.DisableLog('rdApp.*')
+urllib3.disable_warnings()
 
 
 class InitPatentsIntoNeo4j:
 
     def __init__(self, patents_directory=None, number_of_cups=multiprocessing.cpu_count(),
-                 convert_xml_to_csv=False, clean_checker_files=False, insert_compounds_with_functional_groups=False,
+                 convert_xml_to_csv=False, insert_compounds_with_functional_groups=False,
                  insert_change_in_functional_groups=False):
 
         if patents_directory is None:
@@ -31,12 +33,20 @@ class InitPatentsIntoNeo4j:
         self.US_patents_directory = patents_directory
         self.number_of_cpus = number_of_cups
         self.covert_xml_to_csv = convert_xml_to_csv
-        self.clean_checker_files = clean_checker_files
         self.insert_compounds_with_functional_groups = insert_compounds_with_functional_groups
         self.insert_change_in_functional_groups = insert_change_in_functional_groups
-        # self.loading_bars = loading_bars
-
         self.fragments_df = pd.read_csv(get_file_location() + '/datafiles/Function-Groups-SMARTS.csv')
+
+        user_input = input("Would you like to continue were last left off? Y/n\n")
+        while True:
+            if user_input.lower()[0] == 'y':
+                break
+            elif user_input.lower()[0] == 'n':
+                clean_up_checker_files(self.US_patents_directory)
+                break
+            else:
+                user_input = input("Please enter Y/n\n")
+
         self.__main__()
 
     def __main__(self):
@@ -47,8 +57,6 @@ class InitPatentsIntoNeo4j:
 
         if self.covert_xml_to_csv:
             US_grants_directory_to_csvs(self.US_patents_directory)
-        if self.clean_checker_files:
-            clean_up_checker_files(self.US_patents_directory)
 
         main_timer = timeit.default_timer()
         self.__check_for_constraint__()
@@ -99,23 +107,22 @@ class InitPatentsIntoNeo4j:
         data into Neo4j.
         """
 
-        compound_constraint_check_string = """
-                CREATE CONSTRAINT unique_smiles
-                ON (n:Compound)
+        def compound_constraint_check_string(tx):
+            query = """
+                CREATE CONSTRAINT ON (n:Compound) 
                 ASSERT n.smiles IS UNIQUE
-            """
-        reaction_constraint_check_string = """
-                    CREATE CONSTRAINT unique_reactionSmiles
-                    ON (n:Reaction)
-                    ASSERT n.smiles IS UNIQUE
                 """
-        try:
-            tx = graph.begin(autocommit=True)
-            tx.evaluate(compound_constraint_check_string)
-            tx = graph.begin(autocommit=True)
-            tx.evaluate(reaction_constraint_check_string)
-        except py2neo.database.ClientError:
-            pass
+            tx.run(query)
+
+        def reaction_constraint_check_string(tx):
+            query = """
+                CREATE CONSTRAINT ON (n:Reaction)
+                ASSERT n.smiles IS UNIQUE
+                """
+            tx.run(query)
+
+        session.write_transaction(compound_constraint_check_string)
+        session.write_transaction(reaction_constraint_check_string)
 
     def __run_file__(self, working_file):
         """
@@ -139,19 +146,14 @@ class InitPatentsIntoNeo4j:
 
         file_data['patent_index'] = self.parallel_apply(file_data['sources'], self.get_index)
         file_data['reaction_details'] = self.parallel_apply(file_data['sources'], self.get_reaction_details)
-
         file_data = file_data.drop(['sources', 'stages'], axis=1)
 
         reactions = []
         for index, row in file_data.iterrows():
             reactions.append(dict(row))
             if index % 20000 == 0 and index > 0:
-                tx = graph.begin(autocommit=True)
-                tx.evaluate(self.__get_reaction_query__(), parameters={"parameters": reactions})
-
-        tx = graph.begin(autocommit=True)
-        tx.evaluate(self.__get_reaction_query__(), parameters={"parameters": reactions})
-
+                session.write_transaction(self.__insert_reactions__, reactions)
+        session.write_transaction(self.__insert_reactions__, reactions)
 
     @staticmethod
     def __aw__(df_column, function, **props):
@@ -274,7 +276,7 @@ class InitPatentsIntoNeo4j:
         return " ".join(source)
 
     @staticmethod
-    def __get_reaction_query__():
+    def __insert_reactions__(tx, reactions):
         """
         The reaction string below is the query that is feed to Neo4j that will insert all the reactions into neo4j.
         The UNWIND parameter allows neo4j to literate over all rows in a list in a very effective manner compared to
@@ -285,9 +287,9 @@ class InitPatentsIntoNeo4j:
         data
         """
 
-        reaction_query = """
+        query = """
         
-        UNWIND $parameters as row
+        UNWIND $reactions as row
         MERGE (rxn:Reaction {smiles: row.reaction_smiles})
         ON CREATE SET rxn.details = row.reaction_details,
                       rxn.changeinfunctionalgroups = row.change_in_functional_groups,
@@ -325,18 +327,22 @@ class InitPatentsIntoNeo4j:
                  MERGE (rxn)-[:produces]->(com)
                 )   
         """
-        return reaction_query
+        tx.run(query, reactions=reactions)
 
 
 if __name__ == "__main__":
     params = dict(
         patents_directory='5104873',
-        number_of_cups=5,
+        number_of_cups=3,
         convert_xml_to_csv=False,
-        clean_checker_files=False,
         insert_compounds_with_functional_groups=False,
         insert_change_in_functional_groups=False
     )
 
-    graph = Graph(user='neo4j', password='password', bolt_port='bolt://localhost:7687')
-    InitPatentsIntoNeo4j(**params)
+    driver = GraphDatabase.driver('bolt://localhost:7687',
+                                  auth=('neo4j', 'password'),
+                                  encrypted=False)
+
+    with driver.session() as session:
+        InitPatentsIntoNeo4j(**params)
+    driver.close()
